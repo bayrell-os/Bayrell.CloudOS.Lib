@@ -18,6 +18,8 @@
 
 namespace Bayrell.CloudOS.Lib;
 
+use Runtime.lib;
+use Runtime.Crypt.HASH;
 use Runtime.Web.Layout;
 use Runtime.Web.LayoutModel;
 use Runtime.Web.RenderContainer;
@@ -50,13 +52,38 @@ static class Helper
 	
 	
 	
-	#ifcode PHP then
+	/**
+	 * Sign request
+	 */
+	static string sign(Dict data, Dict storage, int time)
+	{
+		string text = data
+			|> default Dict {}
+			|> .keys()
+			|> lib::sort( lib::sortAsc )
+			|> .prependIm(time)
+			|> lib::join("|")
+		;
+		
+		string key = @.env("CLOUD_KEY");
+		string sign = HASH::hash(text, key, "SHA512");
+		
+		return sign;
+	}
+	
+	
 	
 	/**
 	 * Returns curl
 	 */
-	static function curl($url, $data)
+	static var curl(string url, Dict data, Dict storage)
 	{
+		int time = rtl::time();
+		string sign = static::sign(data, storage, time);
+		
+		#switch
+		#case ifcode PHP then
+		
 		$curl = \curl_init();
 		$opt = [
 			CURLOPT_URL => $url,
@@ -68,27 +95,29 @@ static class Helper
 			CURLOPT_CUSTOMREQUEST => 'POST',
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_POSTFIELDS => [
-				"data" => json_encode($data)
+				"data" => \Runtime\RuntimeUtils::json_encode($ctx, $data),
+				"storage" => \Runtime\RuntimeUtils::json_encode($ctx, $storage),
+				"sign" => $sign,
+				"time" => $time,
 			],
 		];
 		\curl_setopt_array($curl, $opt);
 		return $curl;
+		
+		#endswitch
 	}
-	
-	
-	#endif
 	
 	
 	
 	/**
 	 * Send api request
 	 */
-	static var send_api(string url, var data = null)
+	static var send_api(string url, var data = null, var storage = null)
 	{
 		#switch
 		#case ifcode PHP then
 		
-		$curl = static::curl($url, $data);
+		$curl = static::curl($ctx, $url, $data, $storage);
 		$out = \curl_exec($curl);
 		$code = \curl_getinfo($curl, CURLINFO_HTTP_CODE);
 		\curl_close($curl);

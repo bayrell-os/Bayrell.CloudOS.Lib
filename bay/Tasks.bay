@@ -34,7 +34,7 @@ use Bayrell.CloudOS.Lib.ORM.User;
 static class Tasks
 {
 	
-	@CronTimer{ "timer": 15*60*60, "alias": "cloud_os_sync" }
+	@CronTimer{ "timer": 15*60, "alias": "cloud_os_sync" }
 	static async void sync()
 	{
 		await static::syncTopMenu();
