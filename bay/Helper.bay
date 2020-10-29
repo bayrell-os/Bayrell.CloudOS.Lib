@@ -1,0 +1,118 @@
+/*!
+ *  Bayrell Cloud OS
+ *
+ *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+namespace Bayrell.CloudOS.Lib;
+
+use Runtime.Web.Layout;
+use Runtime.Web.LayoutModel;
+use Runtime.Web.RenderContainer;
+use Bayrell.CloudOS.Lib.ORM.TopMenu;
+
+
+static class Helper
+{
+	
+	/**
+	 * Render chain. Route after
+	 */
+	pure RenderContainer renderChainRouteAfter(RenderContainer container)
+	{
+		if (container.layout.layout_name == "admin")
+		{
+			Collection<Dict> items = TopMenu::select()
+			|> .order([
+				["pos", "desc"],
+				["href", "asc"],
+			])
+			|> .asRecord(false)
+			|> await .all();
+			
+			container <= layout <= keep_data <= cloud_os_top_menu <= items;
+		}
+		
+		return [ container ];
+	}
+	
+	
+	
+	#ifcode PHP then
+	
+	/**
+	 * Returns curl
+	 */
+	static function curl($url, $data)
+	{
+		$curl = \curl_init();
+		$opt = [
+			CURLOPT_URL => $url,
+			CURLOPT_TIMEOUT => 10,
+			CURLOPT_CONNECTTIMEOUT => 10,
+			CURLOPT_FOLLOWLOCATION => 10,
+			CURLOPT_SSL_VERIFYHOST => 0,
+			CURLOPT_SSL_VERIFYPEER => false,
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_POSTFIELDS => [
+				"data" => json_encode($data)
+			],
+		];
+		\curl_setopt_array($curl, $opt);
+		return $curl;
+	}
+	
+	
+	#endif
+	
+	
+	
+	/**
+	 * Send api request
+	 */
+	static var send_api(string url, var data = null)
+	{
+		#switch
+		#case ifcode PHP then
+		
+		$curl = static::curl($url, $data);
+		$out = \curl_exec($curl);
+		$code = \curl_getinfo($curl, CURLINFO_HTTP_CODE);
+		\curl_close($curl);
+		
+		$response = null;
+		$code = (int)$code;
+		if ($code == 200 || $code == 204)
+		{
+			$response = @json_decode($out);
+		}
+		else if ($code == 400 || $code == 404)
+		{
+			$response = @json_decode($out);
+		}
+		
+		if ($response != null && isset($response->code) && $response->code == 1)
+		{
+			return \Runtime\RuntimeUtils::NativeToObject($ctx, $response->response);
+		}
+		
+		#endswitch
+		
+		return null;
+	}
+	
+	
+}
